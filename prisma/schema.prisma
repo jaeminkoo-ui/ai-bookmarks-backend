@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,15 +10,49 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model UserTool {
-  id          Int      @id @default(autoincrement())
-  userEmail   String
-  categoryId  String
-  toolName    String
-  toolUrl     String
-  iconUrl     String?
-  createdAt   DateTime @default(now())
+// ★ 1. 사용자 정보를 관리할 User 모델을 새로 추가했습니다.
+model User {
+  id        String   @id @default(cuid())
+  googleId  String   @unique
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([userEmail, categoryId, toolName])
-  @@map("tool_overrides")
+  // 이 User와 연결된 다른 데이터들을 정의합니다.
+  tools     UserTool[]
+  overrides ToolOverride[]
+}
+
+// ★ 2. 기존 UserTool 모델을 수정했습니다.
+model UserTool {
+  id         Int      @id @default(autoincrement())
+  categoryId String
+  toolName   String
+  toolUrl    String
+  iconUrl    String?
+  createdAt  DateTime @default(now())
+
+  // 'userEmail' 대신 'userId'를 통해 User 모델과 관계를 맺습니다.
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+}
+
+// ★ 3. ToolOverride 모델을 새로 추가했습니다.
+// (기존 파일에 이 부분이 누락되어 있었습니다)
+model ToolOverride {
+  categoryId String
+  toolName   String
+  action     String // 'hidden', 'edited'
+  newName    String?
+  newUrl     String?
+  newIconUrl String?
+
+  // 'userEmail' 대신 'userId'를 통해 User 모델과 관계를 맺습니다.
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  // userId, categoryId, toolName을 합쳐서 중복되지 않도록 설정합니다.
+  @@unique([userId, categoryId, toolName])
 }
