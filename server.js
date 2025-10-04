@@ -93,6 +93,28 @@ app.post('/api/user/tools', async (req, res) => {
   }
 });
 
+// 사용자 툴 수정
+app.put('/api/user/tools/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { toolName, toolUrl, iconUrl } = req.body;
+
+    const updatedTool = await prisma.userTool.update({
+      where: { id: parseInt(id) },
+      data: {
+        toolName,
+        toolUrl,
+        iconUrl: iconUrl || null,
+      }
+    });
+
+    res.status(200).json({ tool: updatedTool });
+  } catch (error) {
+    console.error('❌ Error updating tool:', error);
+    res.status(500).json({ message: "Failed to update tool" });
+  }
+});
+
 // 사용자 툴 삭제
 app.delete('/api/user/tools/:id', async (req, res) => {
   try {
