@@ -21,6 +21,7 @@ model UserTool {
   toolUrl     String
   iconUrl     String?
   createdAt   DateTime @default(now())
-  
+
+  @@unique([userEmail, categoryId, toolName])
   @@map("user_tools")
 }

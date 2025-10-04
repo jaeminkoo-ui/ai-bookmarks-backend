@@ -131,6 +131,85 @@ app.delete('/api/user/tools/:id', async (req, res) => {
   }
 });
 
+// 툴 오버라이드 조회
+app.get('/api/user/tool-overrides/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    const overrides = await prisma.toolOverride.findMany({
+      where: { userEmail: email }
+    });
+
+    res.status(200).json({ overrides });
+  } catch (error) {
+    console.error('❌ Error fetching tool overrides:', error);
+    res.status(500).json({ message: "Failed to fetch tool overrides" });
+  }
+});
+
+// 툴 오버라이드 추가/수정
+app.post('/api/user/tool-overrides', async (req, res) => {
+  try {
+    const { userEmail, categoryId, toolName, action, newName, newUrl, newIconUrl } = req.body;
+
+    if (!userEmail || !categoryId || !toolName || !action) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const override = await prisma.toolOverride.upsert({
+      where: {
+        userEmail_categoryId_toolName: {
+          userEmail,
+          categoryId,
+          toolName
+        }
+      },
+      update: {
+        action,
+        newName: newName || null,
+        newUrl: newUrl || null,
+        newIconUrl: newIconUrl || null,
+      },
+      create: {
+        userEmail,
+        categoryId,
+        toolName,
+        action,
+        newName: newName || null,
+        newUrl: newUrl || null,
+        newIconUrl: newIconUrl || null,
+      }
+    });
+
+    res.status(200).json({ override });
+  } catch (error) {
+    console.error('❌ Error saving tool override:', error);
+    res.status(500).json({ message: "Failed to save tool override" });
+  }
+});
+
+// 툴 오버라이드 삭제
+app.delete('/api/user/tool-overrides/:email/:categoryId/:toolName', async (req, res) => {
+  try {
+    const { email, categoryId, toolName } = req.params;
+
+    await prisma.toolOverride.delete({
+      where: {
+        userEmail_categoryId_toolName: {
+          userEmail: email,
+          categoryId,
+          toolName: decodeURIComponent(toolName)
+        }
+      }
+    });
+
+    res.status(200).json({ message: "Tool override deleted successfully" });
+  } catch (error) {
+    console.error('❌ Error deleting tool override:', error);
+    res.status(500).json({ message: "Failed to delete tool override" });
+  }
+});
+
 // 서버 종료 시 Prisma 연결 해제
 process.on('beforeExit', async () => {
   await prisma.$disconnect();
