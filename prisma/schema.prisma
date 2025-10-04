@@ -23,5 +23,5 @@ model UserTool {
   createdAt   DateTime @default(now())
 
   @@unique([userEmail, categoryId, toolName])
-  @@map("user_tools")
+  @@map("tool_overrides")
 }
