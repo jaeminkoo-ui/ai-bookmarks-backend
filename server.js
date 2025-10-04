@@ -1,53 +1,47 @@
 // server.js
 
-// 필요한 라이브러리들을 불러옵니다.
 const express = require('express');
 const cors = require('cors');
-const { OAuth2Client } = require('google-auth-library'); // Google 인증 라이브러리
+const { OAuth2Client } = require('google-auth-library');
+const { PrismaClient } = require('@prisma/client');
 
 const app = express();
-app.use(express.json()); // JSON 형태의 요청 본문을 파싱하기 위해 추가합니다.
+const prisma = new PrismaClient();
 
-// Render에서 설정한 환경 변수를 가져옵니다.
+app.use(express.json());
+
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-// 프론트엔드(매장)에서 오는 요청을 허용해줍니다.
 app.use(cors({ origin: FRONTEND_URL }));
 
 const PORT = process.env.PORT || 8080;
 
-// 기본 테스트 주소
+// 기본 테스트
 app.get('/', (req, res) => {
   res.send('백엔드 서버가 작동 중입니다!');
 });
 
-// --- Google 로그인 요청을 처리할 API 엔드포인트 ---
+// Google 로그인
 app.post('/api/auth/google', async (req, res) => {
   try {
-    const { token } = req.body; // 프론트엔드에서 보낸 idToken
+    const { token } = req.body;
     
-    // Google 라이브러리를 사용해 토큰을 검증합니다.
     const ticket = await client.verifyIdToken({
         idToken: token,
         audience: GOOGLE_CLIENT_ID, 
     });
 
     const payload = ticket.getPayload();
-    const { sub, email, name, picture } = payload; // Google 사용자 정보
+    const { sub, email, name, picture } = payload;
     
     console.log('✅ Google User Verified:', { email, name });
 
-    // TODO: 이 정보를 데이터베이스에 저장하거나 찾는 로직이 여기에 들어갑니다.
-    // 예시: let user = await findOrCreateUser({ googleId: sub, email, name, avatarUrl: picture });
-
-    // 프론트엔드에 성공 응답과 사용자 정보를 보내줍니다.
     res.status(200).json({
       message: "Login successful",
       user: { email, name, avatarUrl: picture },
-      // token: ourServiceToken, // 실제로는 우리 서비스의 JWT 토큰을 생성해서 보내야 합니다.
     });
 
   } catch (error) {
@@ -56,9 +50,70 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
+// 사용자 툴 조회
+app.get('/api/user/tools/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    const tools = await prisma.userTool.findMany({
+      where: { userEmail: email },
+      orderBy: { createdAt: 'desc' }
+    });
 
-// 서버를 실행합니다.
+    res.status(200).json({ tools });
+  } catch (error) {
+    console.error('❌ Error fetching tools:', error);
+    res.status(500).json({ message: "Failed to fetch tools" });
+  }
+});
+
+// 사용자 툴 추가
+app.post('/api/user/tools', async (req, res) => {
+  try {
+    const { userEmail, categoryId, toolName, toolUrl, iconUrl } = req.body;
+
+    if (!userEmail || !categoryId || !toolName || !toolUrl) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const newTool = await prisma.userTool.create({
+      data: {
+        userEmail,
+        categoryId,
+        toolName,
+        toolUrl,
+        iconUrl: iconUrl || null,
+      }
+    });
+
+    res.status(201).json({ tool: newTool });
+  } catch (error) {
+    console.error('❌ Error creating tool:', error);
+    res.status(500).json({ message: "Failed to create tool" });
+  }
+});
+
+// 사용자 툴 삭제
+app.delete('/api/user/tools/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.userTool.delete({
+      where: { id: parseInt(id) }
+    });
+
+    res.status(200).json({ message: "Tool deleted successfully" });
+  } catch (error) {
+    console.error('❌ Error deleting tool:', error);
+    res.status(500).json({ message: "Failed to delete tool" });
+  }
+});
+
+// 서버 종료 시 Prisma 연결 해제
+process.on('beforeExit', async () => {
+  await prisma.$disconnect();
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-
